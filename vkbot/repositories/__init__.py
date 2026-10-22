@@ -1,0 +1,6 @@
+from .account_repository import JsonApiAccountRepository
+from .group_repository import JsonApiGroupRepository
+from .lesson_repository import JsonApiLessonRepository
+from .subscription_repository import JsonApiSubscriptionRepository
+from .teacher_repository import JsonApiTeacherRepository
+from .user_repository import JsonApiUserRepository
