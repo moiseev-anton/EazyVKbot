@@ -1,0 +1,12 @@
+vkbottle==4.11.0
+vkbottle-types==5.199.99.22
+aiohttp==3.14.4
+# vkbottle 4.11.0 explicitly requires this aiofiles version.
+aiofiles==24.1.0
+jsonapi-client==0.9.10
+pydantic==2.14.0
+pydantic-settings==2.15.0
+cachetools==7.2.1
+redis==8.1.0
+tzdata==2026.5
+yarl==1.25.1

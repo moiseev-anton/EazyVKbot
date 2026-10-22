@@ -1,0 +1,131 @@
+# Игнорирование виртуальной среды
+venv/
+.env
+
+# Игнорирование папок __pycache__ и скомпилированных файлов
+**/__pycache__/
+*.pyc
+*.pyo
+
+# Игнорирование миграций
+**/migrations/
+!**/migrations/__init__.py
+
+# Файлы журналов
+*.log
+celery.log
+
+# Файлы базы данных Django
+db.sqlite3
+db.sqlite3-journal
+
+# Папка для медиа-файлов
+media
+
+# Настройки IDE
+.vscode/
+.idea/
+*.swp
+.vscode/settings.json
+.idea/workspace.xml
+
+# Прочие временные и служебные файлы
+*.bak
+*.tmp
+*.secret
+Thumbs.db
+
+# Скомпилированные / оптимизированные файлы Python
+*.py[cod]
+*$py.class
+
+# C-расширения
+*.so
+
+# Файлы и папки для распределения и упаковки
+.Python
+env/
+bin/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Flask
+instance/
+.webassets-cache
+
+# Scrapy
+.scrapy
+
+# Документация Sphinx
+docs/_build/
+
+# PyBuilder
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+#   В соответствии с pypa/pipenv#598 рекомендуется включать Pipfile.lock в контроль версий.
+#   Однако в случае сотрудничества, если используются платформо-зависимые зависимости или зависимости,
+#   которые не поддерживаются кросс-платформенно, механизм блокировки pipenv может некорректно заблокировать или
+#   разрешить зависимости. Раскомментируйте следующую строку, если не хотите включать Pipfile.lock в контроль версий.
+#Pipfile.lock
+
+# PEP 582; если исползоуется pyflow
+__pypackages__/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath обработанные файлы
+*.sage.py
+
+# Окружения
+.venv/
+.vkbottle/
+ENV/
+env.bak/
+venv.bak/
+
+# Настройки Spyder
+.spyderproject
+.spyproject
+
+# Настройки Rope
+.ropeproject
+
+# Документация mkdocs
+/site
+
+# mypy
+.mypy_cache/
+
+# Pyre type checker
+.pyre/
+
+# Данные профилирования
+.prof
+
+.json
+.xml
