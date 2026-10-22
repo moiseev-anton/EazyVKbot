@@ -1,0 +1,12 @@
+.env
+.env.*
+.git
+.venv
+venv
+**/__pycache__
+*.log
+.vkbottle
+vkbot/cache
+tests
+.codex
+.agents
