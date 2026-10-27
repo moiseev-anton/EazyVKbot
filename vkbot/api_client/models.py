@@ -33,10 +33,17 @@ models_as_jsonschema = {
         'firstName': {'type': 'string'},
         'lastName': {'type': ['string', 'null']},
         'username': {'type': 'string'},
-        'notifyScheduleUpdates': {'type': 'boolean'},
-        'notifyUpcomingLessons': {'type': 'boolean'},
         'subscriptions': {'relation': 'to-many', 'resource': ['group-subscriptions', 'teacher-subscriptions']},
-        'accounts': {'relation': 'to-many', 'resource': ['accounts']},
+        'accounts': {'relation': 'to-many', 'resource': ['social-accounts']},
+    }},
+
+    'notification-preferences': {'properties': {
+        'notificationType': {'type': 'string'},
+        'channel': {'type': 'string'},
+        'enabled': {'type': 'boolean'},
+        'createdAt': {'type': 'string'},
+        'updatedAt': {'type': 'string'},
+        'socialAccount': {'relation': 'to-one', 'resource': ['social-accounts']},
     }},
 
     "group-subscriptions": {

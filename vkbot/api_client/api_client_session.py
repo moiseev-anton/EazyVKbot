@@ -169,6 +169,7 @@ class AsyncClientSession(Session):
 
         if method in (HttpMethod.POST, HttpMethod.PATCH):
             headers['Content-Type'] = 'application/vnd.api+json'
+        headers.setdefault('Accept', 'application/vnd.api+json')
 
         return kwargs
 
@@ -262,7 +263,7 @@ class AsyncClientSession(Session):
         request_kwargs = self._build_authenticated_request_kwargs(http_method, url, body_bytes)
 
         async with self._aiohttp_session.request(http_method, url, data=body_bytes, **request_kwargs) as response:
-            response_json = await response.json(content_type=None)
+            response_json = {} if response.status == 204 else await response.json(content_type=None)
 
             if response.status not in expected_statuses:
                 raise DocumentError(
