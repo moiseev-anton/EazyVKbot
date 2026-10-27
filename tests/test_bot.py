@@ -19,6 +19,7 @@ from vkbot.app import main, register_handlers
 from vkbot.context import request_context, set_hmac
 from vkbot.controller import Controller, payload_dict
 from vkbot.dto import AuthDTO, FacultyDTO, GroupDTO, TeacherDTO, LessonDTO, DateSpanDTO
+from vkbot.dto.notification_preference_dto import NotificationPreferenceDTO
 from vkbot.storage import RedisStorage, BusyError
 from vkbot.ui import date_span, schedule_pages, schedule_format_data, keyboard, persistent_keyboard, paginate
 from vkbot.api_client import AsyncClientSession
@@ -102,6 +103,7 @@ class MemoryRedis:
 
 class BotTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
+        self.context_token = request_context.set({"user_id": "42", "hmac": False})
         self.redis = MemoryRedis()
         self.storage = RedisStorage(self.redis, "vkbot:1", ttl=600, nonce_ttl=10)
         self.api = NS(messages=NS(send=AsyncMock(return_value=1), edit=AsyncMock(return_value=True),
@@ -110,7 +112,11 @@ class BotTests(unittest.IsolatedAsyncioTestCase):
         self.faculty = FacultyDTO(id=1, title="Факультет", short_title="ФАК")
         self.group = GroupDTO(id=1, title="А-101", grade=1, faculty_id=1, faculty=self.faculty)
         self.teacher = TeacherDTO(id=2, full_name="Иванов Иван Иванович", short_name="Иванов И. И.")
-        self.user = NS(name="Иван", subscriptions=[], notify_upcoming_lessons=True, notify_schedule_updates=False)
+        self.user = NS(name="Иван", subscriptions=[])
+        self.preferences = {kind: NotificationPreferenceDTO(
+            id=str(index), social_account_id="45", notification_type=kind, channel="vk",
+            enabled=True, updated_at="2026-10-27T00:00:00Z")
+            for index, kind in enumerate(("lesson_upcoming", "schedule_updated"), 123)}
         self.services = NS(
             auth_user=AsyncMock(return_value=NS(nonce_status="authenticated", user=self.user)),
             get_user=AsyncMock(return_value=self.user), refresh=AsyncMock(),
@@ -119,11 +125,15 @@ class BotTests(unittest.IsolatedAsyncioTestCase):
             subscriptions=NS(get_user_subscriptions=AsyncMock(return_value=[]),
                              get_subscription_by_target=AsyncMock(return_value=None),
                              create=AsyncMock(), delete=AsyncMock()),
-            users=NS(get_user=AsyncMock(return_value=self.user), update_user=AsyncMock()),
+            users=NS(get_user=AsyncMock(return_value=self.user)),
+            notifications=NS(get_preferences=AsyncMock(return_value=self.preferences), set_enabled=AsyncMock()),
             lessons=NS(get_lessons=AsyncMock(return_value=[])),
         )
         self.settings = NS(base_link="https://site.invalid", schedule_timezone="Europe/Moscow", show_entity_links=True)
         self.controller = Controller(self.api, self.services, self.storage, self.settings)
+
+    async def asyncTearDown(self):
+        request_context.reset(self.context_token)
 
     def message(self, **kwargs):
         return NS(**{"from_id": 42, "peer_id": 42, "text": "Начать", "ref": None, "payload": None, **kwargs})
@@ -279,16 +289,47 @@ class BotTests(unittest.IsolatedAsyncioTestCase):
     async def test_expired_state_does_not_execute_mutation(self):
         await self.controller.show(42, 42, {"name": "settings"}, [])
         self.redis.now = 601
-        await self.click("toggle", field="notify_upcoming_lessons")
-        self.services.users.update_user.assert_not_awaited()
+        await self.click("toggle", notification_type="lesson_upcoming")
+        self.services.notifications.set_enabled.assert_not_awaited()
         self.assertEqual((await self.storage.get(42))["screen"]["name"], "main")
 
     async def test_replayed_callback_does_not_toggle_twice(self):
         await self.controller.show(42, 42, {"name": "settings"}, [])
         revision = (await self.storage.get(42))["revision"]
-        await self.click("toggle", field="notify_upcoming_lessons")
-        await self.click("toggle", field="notify_upcoming_lessons", revision=revision)
-        self.services.users.update_user.assert_awaited_once_with({"notify_upcoming_lessons": False})
+        await self.click("toggle", notification_type="lesson_upcoming")
+        await self.click("toggle", notification_type="lesson_upcoming", revision=revision)
+        self.services.notifications.set_enabled.assert_awaited_once_with(
+            "42", "lesson_upcoming", False, self.preferences["lesson_upcoming"].version)
+
+    async def test_settings_uses_confirmed_state_and_ignores_callback_preference_id(self):
+        async def change(social_id, kind, enabled, version):
+            self.preferences[kind] = self.preferences[kind].model_copy(update={"enabled": enabled})
+            return self.preferences
+        self.services.notifications.set_enabled.side_effect = change
+        await self.controller.show(42, 42, {"name": "settings"}, [])
+        before = self.preferences["lesson_upcoming"].version
+        await self.click("toggle", notification_type="lesson_upcoming", id="foreign-id", enabled=True)
+        self.services.notifications.set_enabled.assert_awaited_once_with("42", "lesson_upcoming", False, before)
+        keyboard_data = json.loads(self.api.messages.edit.await_args.kwargs["keyboard"])
+        labels = [item["action"]["label"] for row in keyboard_data["buttons"] for item in row]
+        self.assertIn("🔕 Предстоящие занятия", labels)
+        self.assertIn("🔔 Изменения расписания", labels)
+
+    async def test_old_notification_callback_only_refreshes(self):
+        await self.controller.show(42, 42, {"name": "settings"}, [])
+        await self.click("toggle", field="legacy_field")
+        self.services.notifications.set_enabled.assert_not_awaited()
+        self.assertEqual((await self.storage.get(42))["screen"]["name"], "settings")
+
+    async def test_failed_notification_update_does_not_allow_callback_replay(self):
+        await self.controller.show(42, 42, {"name": "settings"}, [])
+        revision = (await self.storage.get(42))["revision"]
+        self.services.notifications.set_enabled.side_effect = RuntimeError("PATCH rejected")
+        with self.assertLogs("vkbot.controller", level="ERROR"):
+            await self.click("toggle", notification_type="lesson_upcoming")
+        self.assertIn("Не удалось выполнить запрос", self.sent_text())
+        await self.click("toggle", notification_type="lesson_upcoming", revision=revision)
+        self.services.notifications.set_enabled.assert_awaited_once()
 
     async def test_group_navigation_schedule_and_back(self):
         await self.controller.show(42, 42, {"name": "main"}, [])
