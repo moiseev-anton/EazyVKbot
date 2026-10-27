@@ -14,8 +14,6 @@ class UserDTO(BaseModel):
     first_name: str
     last_name: Optional[str] = None
     username: str
-    notify_schedule_updates: bool
-    notify_upcoming_lessons: bool
     subscription_ids: List[int] = []
     account_ids: List[int] = []
 
@@ -51,8 +49,6 @@ class UserDTO(BaseModel):
             first_name=user.first_name,
             last_name=user.last_name,
             username=user.username,
-            notify_schedule_updates=user.notify_schedule_updates,
-            notify_upcoming_lessons=user.notify_upcoming_lessons,
             subscription_ids=[sub.id for sub in user.subscriptions._resource_identifiers],
             account_ids=[acc.id for acc in user.accounts._resource_identifiers],
 

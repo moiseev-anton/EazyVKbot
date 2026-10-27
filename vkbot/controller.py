@@ -129,7 +129,7 @@ class Controller:
             async with self.storage.lock(user_id), asyncio.timeout(45):
                 state = await self.storage.get(user_id)
                 data = payload_dict(obj.get("payload"))
-                if not state or data.get("revision") != state.get("revision"):
+                if not state or not state.get("revision") or data.get("revision") != state.get("revision"):
                     await self.send(peer_id, "Это меню устарело. Открываю главную.", persistent_keyboard(self.settings.base_link))
                     await self.authenticate(user_id, peer_id)
                     await self.show(user_id, peer_id, {"name": "main"}, [])
@@ -159,11 +159,16 @@ class Controller:
                 elif command == "back":
                     screen = history.pop() if history else {"name": "main"}
                 elif command == "toggle" and screen["name"] == "settings":
-                    field = data.get("field")
-                    if field not in ("notify_upcoming_lessons", "notify_schedule_updates"):
-                        raise ValueError("Invalid setting")
-                    user = await self.services.users.get_user()
-                    await self.services.users.update_user({field: not getattr(user, field)})
+                    kind = data.get("notification_type")
+                    snapshot = screen.get("preferences", {}).get(kind)
+                    if not snapshot:
+                        # Old menus (including pre-migration callbacks) only refresh.
+                        await self.show(user_id, peer_id, {"name": "settings"}, history, obj.get("conversation_message_id"))
+                        return
+                    state["revision"] = None
+                    await self.storage.set(user_id, state)
+                    await self.services.notifications.set_enabled(
+                        str(user_id), kind, not snapshot["enabled"], snapshot["version"])
                 elif command == "subscribe" and screen["name"] == "entity":
                     await self.services.refresh()
                     subscriptions = await self.services.subscriptions.get_user_subscriptions()
@@ -233,9 +238,14 @@ class Controller:
             user = await self.services.get_user()
             subs = user.subscriptions or []
             if name == "settings":
-                for field, title in (("notify_upcoming_lessons", "Предстоящие занятия"),
-                                     ("notify_schedule_updates", "Изменения расписания")):
-                    rows.append([button(("🔔 " if getattr(user, field) else "🔕 ") + title, "toggle", field=field)])
+                preferences = await self.services.notifications.get_preferences(request_context.get()["user_id"])
+                screen["preferences"] = {}
+                for kind, title in (("lesson_upcoming", "Предстоящие занятия"),
+                                    ("schedule_updated", "Изменения расписания")):
+                    preference = preferences[kind]
+                    screen["preferences"][kind] = {"enabled": preference.enabled, "version": preference.version}
+                    rows.append([button(("🔔 " if preference.enabled else "🔕 ") + title,
+                                        "toggle", notification_type=kind)])
                 if subs:
                     rows.append([button("✖ Отписаться", "unsubscribe", id=subs[0].id)])
                 text = "⚙ Настройки" + (f"\n⭐ Подписка: {subs[0].display_name}" if subs else "\nПодписки нет")

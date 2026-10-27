@@ -1,6 +1,8 @@
 """Application services independent of VK events and keyboards."""
 import asyncio
 from time import monotonic
+from vkbot.notifications import NotificationPreferences
+from vkbot.repositories.notification_preference_repository import JsonApiNotificationPreferenceRepository
 
 from vkbot.repositories import (
     JsonApiAccountRepository, JsonApiUserRepository, JsonApiSubscriptionRepository,
@@ -12,6 +14,8 @@ class Services:
     def __init__(self, client, settings):
         self.accounts = JsonApiAccountRepository(client)
         self.users = JsonApiUserRepository(client)
+        self.notifications = NotificationPreferences(
+            self.accounts, JsonApiNotificationPreferenceRepository(client), settings.platform)
         self.subscriptions = JsonApiSubscriptionRepository(client)
         self.groups_repo = JsonApiGroupRepository(client, settings.groups_cache_file_path)
         self.teachers_repo = JsonApiTeacherRepository(client, settings.teachers_cache_file_path)
